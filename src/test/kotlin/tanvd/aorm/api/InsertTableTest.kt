@@ -16,6 +16,13 @@ class InsertTableTest : AormTestBase() {
     }
 
     @Test
+    fun table_exists() {
+        withDatabase(database) {
+            Assertions.assertTrue(ExampleTable.exists())
+        }
+    }
+
+    @Test
     fun insert_tableExistsRowValid_rowInserted() {
         withDatabase(database) {
             ExampleTable.insert {

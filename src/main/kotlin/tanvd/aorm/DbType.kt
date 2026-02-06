@@ -26,7 +26,7 @@ sealed class DbType<T> {
     abstract fun toStringValue(value: T): String
 
 
-    /** Equals by sql name **/
+    /** Equals by SQL name **/
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
