@@ -66,7 +66,7 @@ class ConnectionContext(val db: Database, private val insertWorker: InsertWorker
         }
 
         if (columnsFromRows.isEmpty()) {
-            throw NoValueInsertedException("No values was inserted during batch insert")
+            throw NoValueInsertedException("No values were inserted during batch insert")
         }
 
         InsertClickhouse.insert(db, InsertExpression(this, columnsFromRows, rows))

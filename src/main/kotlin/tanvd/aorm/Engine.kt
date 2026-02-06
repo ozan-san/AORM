@@ -2,7 +2,6 @@ package tanvd.aorm
 
 import tanvd.aorm.expression.Column
 import tanvd.aorm.expression.Expression
-import java.math.BigInteger
 import java.util.Date
 
 sealed class Engine {
@@ -10,28 +9,32 @@ sealed class Engine {
 
     abstract fun toReplicatedSqlDef(index: Int): String
 
-    abstract class MergeTreeFamily(private val dateColumn: Expression<Date, DbPrimitiveType<Date>>,
-                                   private val primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
-                                   private val indexGranularity: Long = 8192,
-                                   private val zookeeperPath: String? = null,
-                                   internal var partition_by: List<Expression<*, DbPrimitiveType<*>>>? = null,
-                                   internal var order_by: List<Expression<*, DbPrimitiveType<*>>>? = null,
-                                   internal var sample_by: Expression<*, DbPrimitiveType<*>>? = null) : Engine() {
+    abstract class MergeTreeFamily(
+        private val dateColumn: Expression<Date, DbPrimitiveType<Date>>,
+        private val primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
+        private val indexGranularity: Long = 8192,
+        private val zookeeperPath: String? = null,
+        internal var partitionBy: List<Expression<*, DbPrimitiveType<*>>>? = null,
+        internal var orderBy: List<Expression<*, DbPrimitiveType<*>>>? = null,
+        internal var sampleBy: Expression<*, DbPrimitiveType<*>>? = null
+    ) : Engine() {
 
         open val familyModifier: String = ""
 
         open val specificParams: String? = null
 
         val extendedSyntaxUsed: Boolean
-            get() = partition_by != null || order_by != null || sample_by != null
+            get() = partitionBy != null || orderBy != null || sampleBy != null
 
         private val mainSyntaxDef: String
             get() = "${dateColumn.toQueryQualifier()}, (${primaryKey.joinToString { it.toQueryQualifier() }}), $indexGranularity"
 
         private val extendedSyntaxDef: String
-            get() = (partition_by?.let { "PARTITION BY (${it.joinToString { it.toQueryQualifier() }}) " } ?: "") +
-                    (order_by?.let { "ORDER BY (${it.joinToString { it.toQueryQualifier() }}) " } ?: "") +
-                    (sample_by?.let { "SAMPLE BY ${it.toQueryQualifier()} " } ?: "")
+            get() = (partitionBy?.let { expressions -> "PARTITION BY (${expressions.joinToString { it.toQueryQualifier() }}) " }
+                ?: "") +
+                    (orderBy?.let { expressions -> "ORDER BY (${expressions.joinToString { it.toQueryQualifier() }}) " }
+                        ?: "") +
+                    (sampleBy?.let { "SAMPLE BY ${it.toQueryQualifier()} " } ?: "")
 
         override fun toSqlDef() = if (extendedSyntaxUsed)
             "${familyModifier}MergeTree(${specificParams ?: ""}) $extendedSyntaxDef"
@@ -47,38 +50,43 @@ sealed class Engine {
         } ?: throw NotImplementedError("Zookeeper path not stated. Replicated table can not be created.")
     }
 
-    class MergeTree(dateColumn: Expression<Date, DbPrimitiveType<Date>>,
-                    primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
-                    indexGranularity: Long = 8192,
-                    zookeeperPath: String? = null) : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath)
+    class MergeTree(
+        dateColumn: Expression<Date, DbPrimitiveType<Date>>,
+        primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
+        indexGranularity: Long = 8192,
+        zookeeperPath: String? = null
+    ) : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath)
 
-    class ReplacingMergeTree(dateColumn: Expression<Date, DbPrimitiveType<Date>>,
-                             primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
-                             versionColumn: Column<Long, DbUInt64>,
-                             indexGranularity: Long = 8192,
-                             zookeeperPath: String? = null)
-        : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath) {
+    class ReplacingMergeTree(
+        dateColumn: Expression<Date, DbPrimitiveType<Date>>,
+        primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
+        versionColumn: Column<Long, DbUInt64>,
+        indexGranularity: Long = 8192,
+        zookeeperPath: String? = null
+    ) : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath) {
         override val familyModifier = "Replacing"
 
         override val specificParams = versionColumn.name
     }
 
-    class AggregatingMergeTree(dateColumn: Expression<Date, DbPrimitiveType<Date>>,
-                               primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
-                               indexGranularity: Long = 8192,
-                               zookeeperPath: String? = null) : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath) {
+    class AggregatingMergeTree(
+        dateColumn: Expression<Date, DbPrimitiveType<Date>>,
+        primaryKey: List<Expression<*, DbPrimitiveType<*>>>,
+        indexGranularity: Long = 8192,
+        zookeeperPath: String? = null
+    ) : MergeTreeFamily(dateColumn, primaryKey, indexGranularity, zookeeperPath) {
         override val familyModifier = "Aggregating"
     }
 }
 
 fun <T : Engine.MergeTreeFamily> T.partitionBy(vararg key: Expression<*, DbPrimitiveType<*>>) = this.also {
-    it.partition_by = key.toList()
+    it.partitionBy = key.toList()
 }
 
 fun <T : Engine.MergeTreeFamily> T.orderBy(vararg key: Expression<*, DbPrimitiveType<*>>) = this.also {
-    it.order_by = key.toList()
+    it.orderBy = key.toList()
 }
 
 fun <T : Engine.MergeTreeFamily> T.sampleBy(key: Expression<*, DbPrimitiveType<*>>) = this.also {
-    it.sample_by = key
+    it.sampleBy = key
 }
